@@ -5,7 +5,7 @@ from typing import Optional
 
 
 def build_output_path(
-    input_pdf: str,
+    input_file: str,
     output: Optional[str],
     target_ext: str,
 ) -> Path:
@@ -13,12 +13,12 @@ def build_output_path(
     Calcula o caminho de saída.
 
     - Se `output` for um caminho de arquivo, usa esse caminho (ajustando a extensão).
-    - Se `output` for um diretório, cria o mesmo nome do PDF com a nova extensão dentro dele.
-    - Se `output` for None, usa o mesmo diretório do PDF com a nova extensão.
+    - Se `output` for um diretório, cria o mesmo nome do arquivo com a nova extensão dentro dele.
+    - Se `output` for None, usa o mesmo diretório do arquivo com a nova extensão.
     """
-    input_path = Path(input_pdf)
+    input_path = Path(input_file)
     if not input_path.is_file():
-        raise FileNotFoundError(f"Arquivo PDF não encontrado: {input_path}")
+        raise FileNotFoundError(f"Arquivo não encontrado: {input_path}")
 
     if not target_ext.startswith("."):
         target_ext = "." + target_ext
@@ -32,6 +32,6 @@ def build_output_path(
             out_path = out_path.with_suffix(target_ext)
         return out_path
 
-    # Mesmo diretório do PDF
+    # Mesmo diretório do arquivo original
     return input_path.with_suffix(target_ext)
 

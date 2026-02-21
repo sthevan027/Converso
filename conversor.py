@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import sys
+from pathlib import Path
 from typing import Dict, Type
 
 from conversores.base import (
@@ -11,28 +12,37 @@ from conversores.base import (
     TranscriptionQuality,
 )
 from conversores.docx_converter import DocxConverter
+from conversores.pdf_converter import PdfConverter
 from utils.file_utils import build_output_path
 
 
 CONVERTERS: Dict[str, Type[BaseConverter]] = {
     "docx": DocxConverter,
+    "pdf": PdfConverter,
     # "html": HtmlConverter,  # será registrado quando implementarmos
     # "md": MdConverter,
+}
+
+SUPPORTED_INPUTS = {
+    ".pdf": ["docx", "html", "md"],
+    ".docx": ["pdf"],
+    ".txt": ["pdf"],
+    ".md": ["pdf"],
 }
 
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Conversor de PDF para múltiplos formatos (DOCX, HTML, Markdown).",
+        description="Conversor de documentos: PDF ↔ DOCX, TXT → PDF, MD → PDF.",
     )
-    parser.add_argument("input_pdf", help="Caminho do arquivo PDF de entrada.")
+    parser.add_argument("input_file", help="Caminho do arquivo de entrada (PDF, DOCX, TXT, MD).")
     parser.add_argument(
         "--to",
         "-t",
         dest="target",
-        choices=["docx", "html", "md"],
-        default="docx",
-        help="Formato de saída desejado (padrão: docx).",
+        choices=["docx", "pdf", "html", "md"],
+        default=None,
+        help="Formato de saída desejado. Se omitido, detecta automaticamente.",
     )
     parser.add_argument(
         "--output",
@@ -146,6 +156,27 @@ def get_converter_class(target: str) -> Type[BaseConverter]:
         raise ValueError(f"Formato de saída não suportado ainda: {target}")
 
 
+def detect_target_format(input_path: str, target: str | None) -> str:
+    """Detecta o formato de saída baseado no formato de entrada."""
+    ext = Path(input_path).suffix.lower()
+
+    if ext not in SUPPORTED_INPUTS:
+        raise ValueError(f"Formato de entrada não suportado: {ext}")
+
+    if target:
+        if target not in SUPPORTED_INPUTS[ext]:
+            raise ValueError(
+                f"Conversão de {ext} para {target} não suportada. "
+                f"Formatos válidos: {', '.join(SUPPORTED_INPUTS[ext])}"
+            )
+        return target
+
+    if ext == ".pdf":
+        return "docx"
+    else:
+        return "pdf"
+
+
 def _parse_header_footer_mode(mode: str) -> HeaderFooterMode:
     """Converte string para enum HeaderFooterMode."""
     mapping = {
@@ -168,6 +199,12 @@ def _parse_quality(quality: str) -> TranscriptionQuality:
 
 def main(argv: list[str] | None = None) -> int:
     args = parse_args(argv)
+
+    try:
+        target = detect_target_format(args.input_file, args.target)
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
 
     options = ConversionOptions(
         start_page=args.start_page,
@@ -192,24 +229,27 @@ def main(argv: list[str] | None = None) -> int:
     )
 
     try:
-        converter_cls = get_converter_class(args.target)
+        converter_cls = get_converter_class(target)
     except ValueError as exc:
         print(str(exc), file=sys.stderr)
         return 1
 
-    output_path = build_output_path(args.input_pdf, args.output, args.target)
+    output_path = build_output_path(args.input_file, args.output, target)
 
     converter = converter_cls(options=options)
     try:
-        result = converter.convert(args.input_pdf, str(output_path))
+        result = converter.convert(args.input_file, str(output_path))
 
         if args.verbose:
             print(f"\n=== Resultado da Conversão ===")
             print(f"Arquivo gerado: {result.output_path}")
             print(f"Páginas convertidas: {result.pages_converted}")
-            print(f"Cabeçalhos detectados: {result.headers_detected}")
-            print(f"Rodapés detectados: {result.footers_detected}")
-            print(f"Imagens extraídas: {result.images_extracted}")
+            if result.headers_detected:
+                print(f"Cabeçalhos detectados: {result.headers_detected}")
+            if result.footers_detected:
+                print(f"Rodapés detectados: {result.footers_detected}")
+            if result.images_extracted:
+                print(f"Imagens extraídas: {result.images_extracted}")
             if result.warnings:
                 print(f"Avisos: {len(result.warnings)}")
                 for w in result.warnings[:5]:

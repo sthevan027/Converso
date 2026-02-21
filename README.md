@@ -1,22 +1,33 @@
-# Converso – Conversor de PDF
+# Converso – Conversor de Documentos
 
-Conversor avançado em Python para transformar arquivos **PDF** em outros formatos com alta fidelidade.
+Conversor avançado em Python para transformar documentos entre diferentes formatos com alta fidelidade.
 
-**PDF → DOCX (Word)** com detecção inteligente de estrutura, cabeçalhos, rodapés e otimização de transcrição.
+## Conversões Suportadas
 
-Em seguida, serão adicionados conversores para **HTML** e **Markdown**.
+| Entrada | Saída | Descrição |
+|---------|-------|-----------|
+| **PDF** | DOCX | Conversão completa com detecção de estrutura |
+| **DOCX** | PDF | Preserva formatação e estilos |
+| **TXT** | PDF | Texto simples para PDF formatado |
+| **MD** | PDF | Markdown para PDF com títulos |
 
 ---
 
 ## Funcionalidades
 
+### PDF → DOCX
 - **Detecção automática de cabeçalhos e rodapés** - Identifica e converte para cabeçalho/rodapé nativo do Word
 - **Preservação de formatação** - Mantém negrito, itálico e estilos de fonte
 - **Mesclagem inteligente de parágrafos** - Une parágrafos fragmentados automaticamente
 - **Remoção de hifenização** - Remove hífens de quebra de linha
 - **Extração de imagens** - Extrai e incorpora imagens do PDF
 - **Detecção de títulos** - Identifica e aplica estilos de Heading automaticamente
-- **Qualidade configurável** - Modos fast, balanced e high para diferentes necessidades
+
+### DOCX/TXT/MD → PDF
+- **Preservação de estilos** - Headings, negrito, itálico
+- **Quebra de texto automática** - Ajusta ao tamanho A4
+- **Suporte a Markdown** - Converte `#`, `##`, `###` para títulos
+- **Paginação automática** - Cria novas páginas conforme necessário
 
 ---
 
@@ -82,19 +93,29 @@ As principais bibliotecas usadas:
 
 ---
 
-## 4. Usar o conversor (PDF → DOCX)
+## 4. Usar o conversor
 
 Com o venv ativo e dependências instaladas, rode:
 
 ```powershell
-python conversor.py caminho\do\arquivo.pdf --to docx -v
+# PDF para DOCX (detecta automaticamente)
+python conversor.py documento.pdf -v
+
+# DOCX para PDF (detecta automaticamente)
+python conversor.py documento.docx -v
+
+# TXT para PDF
+python conversor.py texto.txt -v
+
+# Markdown para PDF
+python conversor.py arquivo.md -v
 ```
 
 ### Opções principais
 
 | Opção | Descrição |
 |-------|-----------|
-| `--to` / `-t` | Formato de saída (atualmente: `docx`) |
+| `--to` / `-t` | Formato de saída (`docx`, `pdf`). Detecta automaticamente se omitido |
 | `--output` / `-o` | Caminho do arquivo ou pasta de saída |
 | `--start-page` | Página inicial (1-based) |
 | `--end-page` | Página final (1-based, inclusiva) |
@@ -130,26 +151,38 @@ python conversor.py caminho\do\arquivo.pdf --to docx -v
 ### Exemplos
 
 ```powershell
-# Conversão básica com detalhes
-python conversor.py docs\relatorio.pdf --to docx -v
+# === PDF para DOCX ===
+
+# Conversão básica (detecta formato automaticamente)
+python conversor.py docs\relatorio.pdf -v
 
 # Alta qualidade com todas as otimizações
 python conversor.py docs\relatorio.pdf --to docx --quality high -v
 
 # Converter apenas da página 2 até a 5
-python conversor.py docs\relatorio.pdf --to docx --start-page 2 --end-page 5 -v
+python conversor.py docs\relatorio.pdf --start-page 2 --end-page 5 -v
 
-# Remover cabeçalhos e rodapés completamente
-python conversor.py docs\relatorio.pdf --to docx --header-mode remove --footer-mode remove -v
+# Remover cabeçalhos e rodapés
+python conversor.py docs\relatorio.pdf --header-mode remove --footer-mode remove -v
 
 # Conversão rápida sem imagens
-python conversor.py docs\relatorio.pdf --to docx --quality fast --no-images -v
+python conversor.py docs\relatorio.pdf --quality fast --no-images -v
 
-# Ajustar margem de cabeçalho para 15% da página
-python conversor.py docs\relatorio.pdf --to docx --header-margin 0.15 -v
+# === DOCX para PDF ===
 
-# Salvar com um nome e pasta específicos
-python conversor.py docs\relatorio.pdf --to docx -o "C:\saida\relatorio_convertido.docx" -v
+# Conversão básica (detecta formato automaticamente)
+python conversor.py docs\documento.docx -v
+
+# Especificar arquivo de saída
+python conversor.py docs\documento.docx -o "C:\saida\documento_final.pdf" -v
+
+# === TXT para PDF ===
+
+python conversor.py notas.txt -v
+
+# === Markdown para PDF ===
+
+python conversor.py README.md -o documentacao.pdf -v
 ```
 
 ---
@@ -161,5 +194,6 @@ python conversor.py docs\relatorio.pdf --to docx -o "C:\saida\relatorio_converti
 - Adicionar testes automatizados com `pytest`
 - Melhorar detecção de tabelas
 - OCR para PDFs escaneados
+- Melhorar conversão DOCX → PDF com suporte a imagens
 
 ---

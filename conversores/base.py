@@ -84,4 +84,3 @@ class BaseConverter(ABC):
         """Log de mensagem se verbose estiver ativo."""
         if self.options.verbose:
             print(message)
-
