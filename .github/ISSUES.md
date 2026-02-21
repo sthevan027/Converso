@@ -2,7 +2,7 @@
 
 ## Como Criar as Issues no GitHub
 
-1. Acesse: https://github.com/sthevan027/Converso/issues/new
+1. Acesse: <https://github.com/sthevan027/Converso/issues/new>
 2. Copie o conteúdo dos arquivos abaixo
 3. Cole no campo de descrição da issue
 
@@ -16,7 +16,8 @@
 
 **Conteúdo:** Copiar de `.github/ISSUE_TEMPLATE/feature_gui.md`
 
-### Resumo das Fases:
+### Resumo das Fases
+
 1. **Estrutura Base** - Framework e pastas
 2. **Tela Principal** - Drag & drop, seleção de arquivo
 3. **Opções de Configuração** - Configurações avançadas
@@ -33,7 +34,8 @@
 
 **Conteúdo:** Copiar de `.github/ISSUE_TEMPLATE/feature_melhorias.md`
 
-### Resumo das Fases:
+### Resumo das Melhorias
+
 1. **Detecção de Estrutura** - Cabeçalhos, rodapés, títulos
 2. **Extração de Texto** - OCR, colunas, listas
 3. **Tabelas** - Detecção avançada, células mescladas
@@ -60,6 +62,7 @@ gh auth login
 ```
 
 Após instalar, execute:
+
 ```powershell
 gh issue create --title "Interface Grafica (GUI)" --body-file .github/ISSUE_TEMPLATE/feature_gui.md
 gh issue create --title "Melhoria na Logica" --body-file .github/ISSUE_TEMPLATE/feature_melhorias.md

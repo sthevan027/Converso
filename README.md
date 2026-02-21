@@ -5,7 +5,7 @@ Conversor avançado em Python para transformar documentos entre diferentes forma
 ## Conversões Suportadas
 
 | Entrada | Saída | Descrição |
-|---------|-------|-----------|
+| ------- | ----- | --------- |
 | **PDF** | DOCX | Conversão completa com detecção de estrutura |
 | **DOCX** | PDF | Preserva formatação e estilos |
 | **TXT** | PDF | Texto simples para PDF formatado |
@@ -16,6 +16,7 @@ Conversor avançado em Python para transformar documentos entre diferentes forma
 ## Funcionalidades
 
 ### PDF → DOCX
+
 - **Detecção automática de cabeçalhos e rodapés** - Identifica e converte para cabeçalho/rodapé nativo do Word
 - **Preservação de formatação** - Mantém negrito, itálico e estilos de fonte
 - **Mesclagem inteligente de parágrafos** - Une parágrafos fragmentados automaticamente
@@ -24,6 +25,7 @@ Conversor avançado em Python para transformar documentos entre diferentes forma
 - **Detecção de títulos** - Identifica e aplica estilos de Heading automaticamente
 
 ### DOCX/TXT/MD → PDF
+
 - **Preservação de estilos** - Headings, negrito, itálico
 - **Quebra de texto automática** - Ajusta ao tamanho A4
 - **Suporte a Markdown** - Converte `#`, `##`, `###` para títulos
@@ -114,7 +116,7 @@ python conversor.py arquivo.md -v
 ### Opções principais
 
 | Opção | Descrição |
-|-------|-----------|
+| ----- | --------- |
 | `--to` / `-t` | Formato de saída (`docx`, `pdf`). Detecta automaticamente se omitido |
 | `--output` / `-o` | Caminho do arquivo ou pasta de saída |
 | `--start-page` | Página inicial (1-based) |
@@ -124,7 +126,7 @@ python conversor.py arquivo.md -v
 ### Opções de cabeçalho e rodapé
 
 | Opção | Descrição |
-|-------|-----------|
+| ----- | --------- |
 | `--header-mode` | `keep`, `remove` ou `convert` (padrão: convert) |
 | `--footer-mode` | `keep`, `remove` ou `convert` (padrão: convert) |
 | `--header-margin` | Proporção da página para cabeçalho (padrão: 0.10) |
@@ -133,7 +135,7 @@ python conversor.py arquivo.md -v
 ### Opções de qualidade e formatação
 
 | Opção | Descrição |
-|-------|-----------|
+| ----- | --------- |
 | `--quality` / `-q` | `fast`, `balanced` ou `high` (padrão: balanced) |
 | `--no-formatting` | Desativa preservação de formatação |
 | `--no-layout` | Desativa preservação de layout |
@@ -143,7 +145,7 @@ python conversor.py arquivo.md -v
 ### Opções de imagem
 
 | Opção | Descrição |
-|-------|-----------|
+| ----- | --------- |
 | `--no-images` | Não extrai imagens do PDF |
 | `--image-quality` | Qualidade JPEG, 1-100 (padrão: 95) |
 | `--max-image-width` | Largura máxima em pixels (padrão: 800) |
@@ -195,5 +197,3 @@ python conversor.py README.md -o documentacao.pdf -v
 - Melhorar detecção de tabelas
 - OCR para PDFs escaneados
 - Melhorar conversão DOCX → PDF com suporte a imagens
-
----
