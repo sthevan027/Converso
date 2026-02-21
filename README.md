@@ -1,10 +1,22 @@
 # Converso – Conversor de PDF
 
-Conversor em Python para transformar arquivos **PDF** em outros formatos.
+Conversor avançado em Python para transformar arquivos **PDF** em outros formatos com alta fidelidade.
 
-Primeiro foco: **PDF → DOCX (Word)** com boa fidelidade de layout, usando a biblioteca [`pdf2docx`](https://github.com/ArtifexSoftware/pdf2docx.git).
+**PDF → DOCX (Word)** com detecção inteligente de estrutura, cabeçalhos, rodapés e otimização de transcrição.
 
 Em seguida, serão adicionados conversores para **HTML** e **Markdown**.
+
+---
+
+## Funcionalidades
+
+- **Detecção automática de cabeçalhos e rodapés** - Identifica e converte para cabeçalho/rodapé nativo do Word
+- **Preservação de formatação** - Mantém negrito, itálico e estilos de fonte
+- **Mesclagem inteligente de parágrafos** - Une parágrafos fragmentados automaticamente
+- **Remoção de hifenização** - Remove hífens de quebra de linha
+- **Extração de imagens** - Extrai e incorpora imagens do PDF
+- **Detecção de títulos** - Identifica e aplica estilos de Heading automaticamente
+- **Qualidade configurável** - Modos fast, balanced e high para diferentes necessidades
 
 ---
 
@@ -63,9 +75,10 @@ pip install -r requirements.txt
 
 As principais bibliotecas usadas:
 
-- `pdf2docx` – conversão de PDF para DOCX
-- `pymupdf` – leitura/extração de conteúdo e layout do PDF (para HTML/MD futuramente)
-- `html2text`, `python-docx` – suporte a outros formatos
+- `pymupdf` – análise e extração avançada de PDF
+- `python-docx` – criação de documentos Word
+- `pdf2docx` – conversão complementar de PDF para DOCX
+- `html2text` – suporte a outros formatos
 
 ---
 
@@ -79,22 +92,61 @@ python conversor.py caminho\do\arquivo.pdf --to docx -v
 
 ### Opções principais
 
-- **`--to` / `-t`**: formato de saída
-  - atualmente implementado: `docx`
-- **`--output` / `-o`**: caminho do arquivo ou **pasta** de saída  
-  - se não informar, gera `seu-arquivo.docx` na mesma pasta do PDF
-- **`--start-page`**: página inicial (numeração começa em 1)
-- **`--end-page`**: página final (1‑based, inclusiva)
-- **`--verbose` / `-v`**: mostra informações detalhadas da conversão
+| Opção | Descrição |
+|-------|-----------|
+| `--to` / `-t` | Formato de saída (atualmente: `docx`) |
+| `--output` / `-o` | Caminho do arquivo ou pasta de saída |
+| `--start-page` | Página inicial (1-based) |
+| `--end-page` | Página final (1-based, inclusiva) |
+| `--verbose` / `-v` | Mostra informações detalhadas |
+
+### Opções de cabeçalho e rodapé
+
+| Opção | Descrição |
+|-------|-----------|
+| `--header-mode` | `keep`, `remove` ou `convert` (padrão: convert) |
+| `--footer-mode` | `keep`, `remove` ou `convert` (padrão: convert) |
+| `--header-margin` | Proporção da página para cabeçalho (padrão: 0.10) |
+| `--footer-margin` | Proporção da página para rodapé (padrão: 0.10) |
+
+### Opções de qualidade e formatação
+
+| Opção | Descrição |
+|-------|-----------|
+| `--quality` / `-q` | `fast`, `balanced` ou `high` (padrão: balanced) |
+| `--no-formatting` | Desativa preservação de formatação |
+| `--no-layout` | Desativa preservação de layout |
+| `--no-merge-paragraphs` | Desativa mesclagem de parágrafos |
+| `--keep-hyphenation` | Mantém hifenização de fim de linha |
+
+### Opções de imagem
+
+| Opção | Descrição |
+|-------|-----------|
+| `--no-images` | Não extrai imagens do PDF |
+| `--image-quality` | Qualidade JPEG, 1-100 (padrão: 95) |
+| `--max-image-width` | Largura máxima em pixels (padrão: 800) |
 
 ### Exemplos
 
 ```powershell
-# Converter o PDF inteiro para DOCX
+# Conversão básica com detalhes
 python conversor.py docs\relatorio.pdf --to docx -v
+
+# Alta qualidade com todas as otimizações
+python conversor.py docs\relatorio.pdf --to docx --quality high -v
 
 # Converter apenas da página 2 até a 5
 python conversor.py docs\relatorio.pdf --to docx --start-page 2 --end-page 5 -v
+
+# Remover cabeçalhos e rodapés completamente
+python conversor.py docs\relatorio.pdf --to docx --header-mode remove --footer-mode remove -v
+
+# Conversão rápida sem imagens
+python conversor.py docs\relatorio.pdf --to docx --quality fast --no-images -v
+
+# Ajustar margem de cabeçalho para 15% da página
+python conversor.py docs\relatorio.pdf --to docx --header-margin 0.15 -v
 
 # Salvar com um nome e pasta específicos
 python conversor.py docs\relatorio.pdf --to docx -o "C:\saida\relatorio_convertido.docx" -v
@@ -107,5 +159,7 @@ python conversor.py docs\relatorio.pdf --to docx -o "C:\saida\relatorio_converti
 - Implementar conversão **PDF → HTML** usando `PyMuPDF`
 - Gerar **Markdown** reaproveitando o HTML
 - Adicionar testes automatizados com `pytest`
+- Melhorar detecção de tabelas
+- OCR para PDFs escaneados
 
 ---
