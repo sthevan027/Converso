@@ -5,7 +5,6 @@ from typing import Optional
 
 import fitz  # PyMuPDF
 from docx import Document
-from docx.shared import Pt
 
 from .base import BaseConverter, ConversionOptions, ConversionResult
 
@@ -80,7 +79,6 @@ class PdfConverter(BaseConverter):
                 continue
 
             font_size = 11
-            font_name = "helv"
             is_bold = False
 
             if para.style and para.style.name:

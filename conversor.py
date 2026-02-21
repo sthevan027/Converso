@@ -241,7 +241,7 @@ def main(argv: list[str] | None = None) -> int:
         result = converter.convert(args.input_file, str(output_path))
 
         if args.verbose:
-            print(f"\n=== Resultado da Conversão ===")
+            print("\n=== Resultado da Conversão ===")
             print(f"Arquivo gerado: {result.output_path}")
             print(f"Páginas convertidas: {result.pages_converted}")
             if result.headers_detected:

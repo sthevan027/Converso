@@ -11,7 +11,7 @@ from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches, Pt, RGBColor
+from docx.shared import Inches, Pt
 
 from utils.pdf_analyzer import PDFAnalyzer, PageAnalysis, TextBlock
 
@@ -20,7 +20,6 @@ from .base import (
     ConversionOptions,
     ConversionResult,
     HeaderFooterMode,
-    TranscriptionQuality,
 )
 
 
