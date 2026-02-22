@@ -57,11 +57,11 @@ class PdfConverter(BaseConverter):
         doc = Document(docx_path)
         pdf_doc = fitz.open()
 
-        page_width = 595  # A4 width in points
-        page_height = 842  # A4 height in points
-        margin = 72  # 1 inch margin
-        line_height = 14
-        current_y = margin
+        page_width: float = 595.0  # A4 width in points
+        page_height: float = 842.0  # A4 height in points
+        margin: float = 72.0  # 1 inch margin
+        line_height: float = 14.0
+        current_y: float = margin
         current_page = None
 
         def new_page():
@@ -78,22 +78,22 @@ class PdfConverter(BaseConverter):
                 current_y += line_height / 2
                 continue
 
-            font_size = 11
+            font_size: float = 11.0
             is_bold = False
 
             if para.style and para.style.name:
                 style_name = para.style.name.lower()
                 if "heading 1" in style_name:
-                    font_size = 18
+                    font_size = 18.0
                     is_bold = True
                 elif "heading 2" in style_name:
-                    font_size = 14
+                    font_size = 14.0
                     is_bold = True
                 elif "heading 3" in style_name:
-                    font_size = 12
+                    font_size = 12.0
                     is_bold = True
                 elif "title" in style_name:
-                    font_size = 20
+                    font_size = 20.0
                     is_bold = True
 
             if para.runs:
@@ -198,10 +198,10 @@ class PdfConverter(BaseConverter):
         pdf_doc = fitz.open()
         page = pdf_doc.new_page(width=595, height=842)
 
-        margin = 72
-        current_y = margin
-        font_size = 11
-        line_height = font_size * 1.5
+        margin: float = 72.0
+        current_y: float = margin
+        font_size: float = 11.0
+        line_height: float = font_size * 1.5
 
         lines = content.split("\n")
 
@@ -232,25 +232,25 @@ class PdfConverter(BaseConverter):
         pdf_doc = fitz.open()
         page = pdf_doc.new_page(width=595, height=842)
 
-        margin = 72
-        current_y = margin
+        margin: float = 72.0
+        current_y: float = margin
 
         lines = content.split("\n")
 
         for line in lines:
-            font_size = 11
+            font_size: float = 11.0
             is_heading = False
 
             if line.startswith("### "):
-                font_size = 12
+                font_size = 12.0
                 line = line[4:]
                 is_heading = True
             elif line.startswith("## "):
-                font_size = 14
+                font_size = 14.0
                 line = line[3:]
                 is_heading = True
             elif line.startswith("# "):
-                font_size = 18
+                font_size = 18.0
                 line = line[2:]
                 is_heading = True
 

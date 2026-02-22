@@ -6,7 +6,8 @@ from pathlib import Path
 from typing import Optional
 
 import fitz  # PyMuPDF
-from docx import Document
+from docx import Document as create_document
+from docx.document import Document as WordDocument
 from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
@@ -61,7 +62,7 @@ class DocxConverter(BaseConverter):
 
             self._log(f"[DOCX] Convertendo {len(analysis.pages)} páginas...")
 
-            word_doc = Document()
+            word_doc = create_document()
             self._setup_document(word_doc, doc)
 
             for page_analysis in analysis.pages:
@@ -85,7 +86,7 @@ class DocxConverter(BaseConverter):
 
         return self._result
 
-    def _setup_document(self, word_doc: Document, pdf_doc: fitz.Document) -> None:
+    def _setup_document(self, word_doc: WordDocument, pdf_doc: fitz.Document) -> None:
         """Configura o documento Word com base no PDF."""
         if len(pdf_doc) > 0:
             page = pdf_doc[0]
@@ -110,7 +111,7 @@ class DocxConverter(BaseConverter):
 
     def _convert_page(
         self,
-        word_doc: Document,
+        word_doc: WordDocument,
         pdf_doc: fitz.Document,
         page_analysis: PageAnalysis,
         doc_analysis,
@@ -134,7 +135,7 @@ class DocxConverter(BaseConverter):
         if page_analysis.page_num < len(pdf_doc) - 1:
             word_doc.add_page_break()
 
-    def _add_body_content(self, word_doc: Document, page_analysis: PageAnalysis) -> None:
+    def _add_body_content(self, word_doc: WordDocument, page_analysis: PageAnalysis) -> None:
         """Adiciona o conteúdo do corpo da página."""
         if not page_analysis.body_blocks:
             return
@@ -289,7 +290,7 @@ class DocxConverter(BaseConverter):
 
     def _extract_and_add_images(
         self,
-        word_doc: Document,
+        word_doc: WordDocument,
         page: fitz.Page,
         page_analysis: PageAnalysis,
     ) -> None:
@@ -313,7 +314,7 @@ class DocxConverter(BaseConverter):
             except Exception as e:
                 self._result.warnings.append(f"Erro ao extrair imagem: {e}")
 
-    def _add_word_header(self, word_doc: Document, header_text: str) -> None:
+    def _add_word_header(self, word_doc: WordDocument, header_text: str) -> None:
         """Adiciona cabeçalho ao documento Word."""
         section = word_doc.sections[-1]
         header = section.header
@@ -324,7 +325,7 @@ class DocxConverter(BaseConverter):
             para.text = clean_text
             para.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-    def _add_word_footer(self, word_doc: Document, footer_text: str) -> None:
+    def _add_word_footer(self, word_doc: WordDocument, footer_text: str) -> None:
         """Adiciona rodapé ao documento Word."""
         section = word_doc.sections[-1]
         footer = section.footer

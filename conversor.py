@@ -33,7 +33,7 @@ SUPPORTED_INPUTS = {
 
 def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Conversor de documentos: PDF ↔ DOCX, TXT → PDF, MD → PDF.",
+        description="Conversor de documentos: PDF <-> DOCX, TXT -> PDF, MD -> PDF.",
     )
     parser.add_argument("input_file", help="Caminho do arquivo de entrada (PDF, DOCX, TXT, MD).")
     parser.add_argument(
