@@ -6,6 +6,8 @@ from typing import Optional
 
 import fitz  # PyMuPDF
 
+from utils.ocr_engine import is_scanned_page, ocr_page
+
 
 @dataclass
 class TextBlock:
@@ -36,6 +38,7 @@ class PageAnalysis:
     header_text: str = ""
     footer_text: str = ""
     body_text: str = ""
+    is_scanned: bool = False
 
 
 @dataclass
@@ -46,6 +49,7 @@ class DocumentAnalysis:
     common_header: str = ""
     common_footer: str = ""
     detected_page_numbers: bool = False
+    has_scanned_pages: bool = False
 
 
 class PDFAnalyzer:
@@ -75,6 +79,8 @@ class PDFAnalyzer:
                 page = doc[page_num]
                 page_analysis = self._analyze_page(page, page_num)
                 analysis.pages.append(page_analysis)
+                if page_analysis.is_scanned:
+                    analysis.has_scanned_pages = True
 
             self._detect_common_headers_footers(analysis)
             return analysis
@@ -95,10 +101,68 @@ class PDFAnalyzer:
             height=height,
         )
 
+        if is_scanned_page(page):
+            page_analysis.is_scanned = True
+            self._analyze_scanned_page(page, page_analysis, header_threshold, footer_threshold)
+        else:
+            self._analyze_native_page(page, page_analysis, header_threshold, footer_threshold)
+
+        page_analysis.header_text = self._blocks_to_text(page_analysis.header_blocks)
+        page_analysis.footer_text = self._blocks_to_text(page_analysis.footer_blocks)
+        page_analysis.body_text = self._blocks_to_text(page_analysis.body_blocks)
+
+        return page_analysis
+
+    def _analyze_scanned_page(
+        self,
+        page: fitz.Page,
+        page_analysis: PageAnalysis,
+        header_threshold: float,
+        footer_threshold: float,
+    ) -> None:
+        """Analisa uma página escaneada usando OCR."""
+        ocr_result = ocr_page(page, dpi=300)
+
+        for line in ocr_result.text_lines:
+            x0, y0, x1, y1 = line.bbox
+            block_height = y1 - y0
+            estimated_font_size = max(block_height * 0.65, 8.0)
+
+            text_block = TextBlock(
+                text=line.text,
+                x0=x0,
+                y0=y0,
+                x1=x1,
+                y1=y1,
+                font_name="OCR",
+                font_size=min(estimated_font_size, 24.0),
+                is_bold=estimated_font_size > 14,
+            )
+
+            y_center = (y0 + y1) / 2
+
+            if y_center < header_threshold:
+                text_block.block_type = "header"
+                page_analysis.header_blocks.append(text_block)
+            elif y_center > footer_threshold:
+                text_block.block_type = "footer"
+                page_analysis.footer_blocks.append(text_block)
+            else:
+                text_block.block_type = "body"
+                page_analysis.body_blocks.append(text_block)
+
+    def _analyze_native_page(
+        self,
+        page: fitz.Page,
+        page_analysis: PageAnalysis,
+        header_threshold: float,
+        footer_threshold: float,
+    ) -> None:
+        """Analisa uma página com texto nativo."""
         blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
 
         for block in blocks:
-            if block["type"] != 0:  # Não é texto
+            if block["type"] != 0:
                 continue
 
             for line in block.get("lines", []):
@@ -135,12 +199,6 @@ class PDFAnalyzer:
                     else:
                         text_block.block_type = "body"
                         page_analysis.body_blocks.append(text_block)
-
-        page_analysis.header_text = self._blocks_to_text(page_analysis.header_blocks)
-        page_analysis.footer_text = self._blocks_to_text(page_analysis.footer_blocks)
-        page_analysis.body_text = self._blocks_to_text(page_analysis.body_blocks)
-
-        return page_analysis
 
     def _blocks_to_text(self, blocks: list[TextBlock]) -> str:
         """Converte blocos de texto em string formatada."""

@@ -189,7 +189,63 @@ python conversor.py README.md -o documentacao.pdf -v
 
 ---
 
-## 5. Próximos passos (roadmap rápido)
+## 5. Interface gráfica (GUI) e executável .exe
+
+### Iniciar a GUI (com criação/verificação do ambiente virtual)
+
+Use o **launcher** (CMD ou PowerShell) para criar/verificar o ambiente virtual e iniciar o app:
+
+```powershell
+.\run_converso.bat
+```
+
+O launcher:
+- Cria a pasta `.venv` se não existir
+- Roda `pip install -r requirements.txt` para garantir dependências
+- Inicia a aplicação (`python run_gui.py`)
+
+Se preferir fazer tudo manualmente (com o venv já ativado):
+
+```powershell
+python run_gui.py
+```
+
+### Verificação de atualização
+
+Dentro do app, em **Configurações → Sobre**, você pode:
+
+1. **URL de atualização (opcional):** informe uma URL que retorne a versão mais recente, por exemplo:
+   - Um arquivo JSON: `{"version": "1.0.1", "url": "https://github.com/.../releases"}`
+   - Ou um arquivo de texto com uma linha: `1.0.1`
+2. Clicar em **Verificar atualizações** para checar se há nova versão. Se houver e você tiver informado `url` no JSON, o app pode abrir o link de download.
+
+O executável (.exe) também inclui essa função: ao rodar o Converso.exe, use Configurações → Verificar atualizações (desde que a URL esteja configurada).
+
+### Gerar um executável .exe (opcional)
+
+Assim você não precisa rodar `python run_gui.py` — basta dar duplo clique no `.exe`.
+
+1. Com o ambiente ativado e dependências instaladas (`pip install -r requirements.txt`).
+2. Execute o script de build:
+
+   **No CMD ou PowerShell:**
+   ```powershell
+   .\build_exe.bat
+   ```
+
+   **Ou manualmente:**
+   ```powershell
+   pip install pyinstaller
+   pyinstaller converso.spec
+   ```
+
+3. O executável será criado em **`dist\Converso.exe`**. Copie esse arquivo para onde quiser e execute com duplo clique.
+
+**Observação:** O primeiro build pode demorar alguns minutos. Se você tiver um ícone para o app, coloque em `gui/assets/icon.ico` e edite `converso.spec` para incluir a pasta `gui/assets` em `datas` (instruções no próprio arquivo).
+
+---
+
+## 6. Próximos passos (roadmap rápido)
 
 - Implementar conversão **PDF → HTML** usando `PyMuPDF`
 - Gerar **Markdown** reaproveitando o HTML

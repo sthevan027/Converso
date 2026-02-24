@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import io
 import re
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -12,9 +13,9 @@ from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, Cm
 
-from utils.pdf_analyzer import PDFAnalyzer, PageAnalysis, TextBlock
+from utils.ocr_engine import is_scanned_page, ocr_page, OCRLine
 
 from .base import (
     BaseConverter,
@@ -24,15 +25,37 @@ from .base import (
 )
 
 
+def _detect_document_type(pdf_path: str) -> str:
+    """Detecta se o PDF é nativo, escaneado ou misto."""
+    doc = fitz.open(pdf_path)
+    try:
+        native_count = 0
+        scanned_count = 0
+        for page in doc:
+            if is_scanned_page(page):
+                scanned_count += 1
+            else:
+                native_count += 1
+
+        if scanned_count == 0:
+            return "native"
+        if native_count == 0:
+            return "scanned"
+        return "mixed"
+    finally:
+        doc.close()
+
+
 class DocxConverter(BaseConverter):
-    """Conversor avançado de PDF para DOCX com detecção de estrutura."""
+    """Conversor robusto de PDF para DOCX.
+
+    - PDFs nativos: usa pdf2docx para máxima fidelidade.
+    - PDFs escaneados: usa OCR (RapidOCR) + construção estruturada.
+    - PDFs mistos: combina ambas as abordagens.
+    """
 
     def __init__(self, options: Optional[ConversionOptions] = None) -> None:
         super().__init__(options)
-        self._analyzer = PDFAnalyzer(
-            header_margin_ratio=self.options.header_margin_ratio,
-            footer_margin_ratio=self.options.footer_margin_ratio,
-        )
         self._result: ConversionResult = None  # type: ignore
 
     def convert(self, pdf_path: str, output_path: str) -> ConversionResult:
@@ -43,319 +66,329 @@ class DocxConverter(BaseConverter):
         output_file = Path(output_path)
         output_file.parent.mkdir(parents=True, exist_ok=True)
 
-        self._result = ConversionResult(
-            success=False,
-            output_path=str(output_file),
-        )
+        self._result = ConversionResult(success=False, output_path=str(output_file))
 
         start, end = self._resolve_page_range()
+        doc_type = _detect_document_type(str(pdf_file))
 
-        self._log(f"[DOCX] Analisando '{pdf_file}'...")
+        self._log(f"[DOCX] Tipo detectado: {doc_type} | '{pdf_file.name}'")
 
         try:
-            doc = fitz.open(str(pdf_file))
-            analysis = self._analyzer.analyze_document(
-                str(pdf_file),
-                start_page=(start - 1) if start else 0,
-                end_page=end if end else None,
-            )
-
-            self._log(f"[DOCX] Convertendo {len(analysis.pages)} páginas...")
-
-            word_doc = create_document()
-            self._setup_document(word_doc, doc)
-
-            for page_analysis in analysis.pages:
-                self._convert_page(word_doc, doc, page_analysis, analysis)
-                self._result.pages_converted += 1
-
-            if analysis.common_header:
-                self._result.headers_detected = len(analysis.pages)
-            if analysis.common_footer:
-                self._result.footers_detected = len(analysis.pages)
-
-            word_doc.save(str(output_file))
-            doc.close()
+            if doc_type == "native":
+                self._convert_native(str(pdf_file), str(output_file), start, end)
+            elif doc_type == "scanned":
+                self._convert_scanned(str(pdf_file), str(output_file), start, end)
+            else:
+                self._convert_mixed(str(pdf_file), str(output_file), start, end)
 
             self._result.success = True
             self._log(f"[DOCX] Arquivo gerado: {output_file}")
-
         except Exception as e:
             self._result.errors.append(str(e))
             raise
 
         return self._result
 
-    def _setup_document(self, word_doc: WordDocument, pdf_doc: fitz.Document) -> None:
-        """Configura o documento Word com base no PDF."""
-        if len(pdf_doc) > 0:
-            page = pdf_doc[0]
-            width_pt = page.rect.width
-            height_pt = page.rect.height
+    # ------------------------------------------------------------------
+    # PDFs nativos → pdf2docx (alta fidelidade)
+    # ------------------------------------------------------------------
 
-            section = word_doc.sections[0]
-
-            if width_pt > height_pt:
-                section.orientation = WD_ORIENT.LANDSCAPE
-                section.page_width = Pt(height_pt)
-                section.page_height = Pt(width_pt)
-            else:
-                section.orientation = WD_ORIENT.PORTRAIT
-                section.page_width = Pt(width_pt)
-                section.page_height = Pt(height_pt)
-
-            section.left_margin = Inches(0.75)
-            section.right_margin = Inches(0.75)
-            section.top_margin = Inches(0.75)
-            section.bottom_margin = Inches(0.75)
-
-    def _convert_page(
-        self,
-        word_doc: WordDocument,
-        pdf_doc: fitz.Document,
-        page_analysis: PageAnalysis,
-        doc_analysis,
+    def _convert_native(
+        self, pdf_path: str, output_path: str,
+        start: Optional[int], end: Optional[int],
     ) -> None:
-        """Converte uma página do PDF para o documento Word."""
-        page = pdf_doc[page_analysis.page_num]
+        from pdf2docx import Converter as Pdf2DocxConverter
 
-        if self.options.header_mode == HeaderFooterMode.CONVERT_TO_HEADER:
-            if page_analysis.header_text and doc_analysis.common_header:
-                self._add_word_header(word_doc, page_analysis.header_text)
+        self._log("[DOCX] Convertendo PDF nativo via pdf2docx...")
 
-        if self.options.extract_images:
-            self._extract_and_add_images(word_doc, page, page_analysis)
+        cv = Pdf2DocxConverter(pdf_path)
+        try:
+            pages = self._build_page_list(pdf_path, start, end)
+            cv.convert(output_path, pages=pages)
+            self._result.pages_converted = len(pages) if pages else self._count_pages(pdf_path)
+        finally:
+            cv.close()
 
-        self._add_body_content(word_doc, page_analysis)
+    # ------------------------------------------------------------------
+    # PDFs escaneados → OCR + DOCX estruturado
+    # ------------------------------------------------------------------
 
-        if self.options.footer_mode == HeaderFooterMode.CONVERT_TO_HEADER:
-            if page_analysis.footer_text and doc_analysis.common_footer:
-                self._add_word_footer(word_doc, page_analysis.footer_text)
+    def _convert_scanned(
+        self, pdf_path: str, output_path: str,
+        start: Optional[int], end: Optional[int],
+    ) -> None:
+        self._log("[DOCX] Convertendo PDF escaneado via OCR...")
 
-        if page_analysis.page_num < len(pdf_doc) - 1:
-            word_doc.add_page_break()
+        doc = fitz.open(pdf_path)
+        try:
+            word_doc = create_document()
+            pages = self._get_page_range(doc, start, end)
 
-    def _add_body_content(self, word_doc: WordDocument, page_analysis: PageAnalysis) -> None:
-        """Adiciona o conteúdo do corpo da página."""
-        if not page_analysis.body_blocks:
+            first = True
+            for page_num in pages:
+                if not first:
+                    word_doc.add_page_break()
+                first = False
+
+                page = doc[page_num]
+                self._setup_section_from_page(word_doc, page, page_num == pages[0])
+                self._ocr_page_to_docx(word_doc, page, page_num)
+                self._result.pages_converted += 1
+
+            word_doc.save(output_path)
+        finally:
+            doc.close()
+
+    # ------------------------------------------------------------------
+    # PDFs mistos → pdf2docx para nativas + OCR para escaneadas
+    # ------------------------------------------------------------------
+
+    def _convert_mixed(
+        self, pdf_path: str, output_path: str,
+        start: Optional[int], end: Optional[int],
+    ) -> None:
+        self._log("[DOCX] Convertendo PDF misto (nativo + escaneado)...")
+
+        doc = fitz.open(pdf_path)
+        try:
+            pages = self._get_page_range(doc, start, end)
+
+            native_pages = []
+            scanned_pages = []
+            for pn in pages:
+                if is_scanned_page(doc[pn]):
+                    scanned_pages.append(pn)
+                else:
+                    native_pages.append(pn)
+
+            self._log(f"  Nativas: {len(native_pages)} | Escaneadas: {len(scanned_pages)}")
+
+            if native_pages and not scanned_pages:
+                doc.close()
+                self._convert_native(pdf_path, output_path, start, end)
+                return
+            if scanned_pages and not native_pages:
+                doc.close()
+                self._convert_scanned(pdf_path, output_path, start, end)
+                return
+
+            native_tmp = None
+            try:
+                if native_pages:
+                    from pdf2docx import Converter as Pdf2DocxConverter
+                    native_tmp = tempfile.NamedTemporaryFile(suffix=".docx", delete=False)
+                    native_tmp.close()
+                    cv = Pdf2DocxConverter(pdf_path)
+                    cv.convert(native_tmp.name, pages=native_pages)
+                    cv.close()
+
+                word_doc = create_document()
+
+                first = True
+                for page_num in pages:
+                    if not first:
+                        word_doc.add_page_break()
+                    first = False
+
+                    page = doc[page_num]
+                    self._setup_section_from_page(word_doc, page, page_num == pages[0])
+
+                    if page_num in scanned_pages:
+                        self._ocr_page_to_docx(word_doc, page, page_num)
+                    else:
+                        self._native_page_to_docx(word_doc, page, page_num)
+
+                    self._result.pages_converted += 1
+
+                word_doc.save(output_path)
+            finally:
+                if native_tmp:
+                    Path(native_tmp.name).unlink(missing_ok=True)
+        finally:
+            doc.close()
+
+    # ------------------------------------------------------------------
+    # OCR de uma página → parágrafos no DOCX
+    # ------------------------------------------------------------------
+
+    def _ocr_page_to_docx(
+        self, word_doc: WordDocument, page: fitz.Page, page_num: int,
+    ) -> None:
+        self._log(f"  [OCR] Página {page_num + 1}...")
+        ocr_result = ocr_page(page, dpi=300)
+
+        if not ocr_result.text_lines:
+            self._result.warnings.append(f"Página {page_num + 1}: nenhum texto detectado pelo OCR")
             return
 
-        sorted_blocks = sorted(page_analysis.body_blocks, key=lambda b: (b.y0, b.x0))
+        groups = self._group_ocr_lines(ocr_result.text_lines, page.rect.height)
 
-        paragraphs = self._group_into_paragraphs(sorted_blocks)
+        for group in groups:
+            text = " ".join(line.text for line in group)
+            text = self._normalize_ocr_spacing(text)
 
-        for para_blocks in paragraphs:
-            if not para_blocks:
-                continue
-
-            text = self._blocks_to_paragraph_text(para_blocks)
             if not text.strip():
                 continue
 
-            if self.options.remove_hyphenation:
-                text = self._remove_hyphenation(text)
-
-            if self.options.merge_paragraphs:
-                text = self._clean_paragraph(text)
-
             para = word_doc.add_paragraph()
 
-            if self._is_title_block(para_blocks):
-                self._apply_title_style(para, para_blocks[0])
+            avg_height = sum(l.bbox[3] - l.bbox[1] for l in group) / len(group)
+            font_size = max(min(avg_height * 0.65, 24.0), 8.0)
+
+            if font_size > 13 and len(text) < 80:
+                if font_size >= 18:
+                    para.style = "Heading 1"
+                elif font_size >= 14:
+                    para.style = "Heading 2"
+                else:
+                    para.style = "Heading 3"
             else:
-                self._apply_paragraph_style(para, para_blocks)
+                para.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
             run = para.add_run(text)
-            self._apply_text_formatting(run, para_blocks)
+            run.font.size = Pt(min(font_size, 12))
 
-    def _group_into_paragraphs(self, blocks: list[TextBlock]) -> list[list[TextBlock]]:
-        """Agrupa blocos de texto em parágrafos lógicos."""
-        if not blocks:
+    def _group_ocr_lines(
+        self, lines: list[OCRLine], page_height: float,
+    ) -> list[list[OCRLine]]:
+        """Agrupa linhas OCR em parágrafos baseado em proximidade vertical."""
+        if not lines:
             return []
 
-        paragraphs: list[list[TextBlock]] = []
-        current_para: list[TextBlock] = []
-        last_y: float = -1
-        last_font_size: float = 0
+        sorted_lines = sorted(lines, key=lambda l: (l.bbox[1], l.bbox[0]))
 
-        for block in blocks:
-            if last_y < 0:
-                current_para.append(block)
-                last_y = block.y1
-                last_font_size = block.font_size
-                continue
+        groups: list[list[OCRLine]] = []
+        current: list[OCRLine] = [sorted_lines[0]]
 
-            line_spacing = block.y0 - last_y
-            threshold = max(last_font_size, block.font_size) * 1.8
+        for line in sorted_lines[1:]:
+            prev = current[-1]
+            prev_bottom = prev.bbox[3]
+            curr_top = line.bbox[1]
+            gap = curr_top - prev_bottom
 
-            if line_spacing > threshold:
-                if current_para:
-                    paragraphs.append(current_para)
-                current_para = [block]
+            prev_height = prev.bbox[3] - prev.bbox[1]
+            curr_height = line.bbox[3] - line.bbox[1]
+            avg_height = (prev_height + curr_height) / 2
+
+            if gap > avg_height * 1.5:
+                groups.append(current)
+                current = [line]
             else:
-                current_para.append(block)
+                current.append(line)
 
-            last_y = block.y1
-            last_font_size = block.font_size
+        if current:
+            groups.append(current)
 
-        if current_para:
-            paragraphs.append(current_para)
+        return groups
 
-        return paragraphs
-
-    def _blocks_to_paragraph_text(self, blocks: list[TextBlock]) -> str:
-        """Converte blocos em texto de parágrafo."""
-        if not blocks:
-            return ""
-
-        lines: list[list[TextBlock]] = []
-        current_line: list[TextBlock] = []
-        last_y: float = -1
-
-        for block in sorted(blocks, key=lambda b: (b.y0, b.x0)):
-            if last_y < 0 or abs(block.y0 - last_y) < block.font_size * 0.7:
-                current_line.append(block)
-            else:
-                if current_line:
-                    lines.append(current_line)
-                current_line = [block]
-            last_y = block.y0
-
-        if current_line:
-            lines.append(current_line)
-
-        text_lines = []
-        for line in lines:
-            sorted_line = sorted(line, key=lambda b: b.x0)
-            line_text = " ".join(b.text for b in sorted_line)
-            text_lines.append(line_text)
-
-        return "\n".join(text_lines)
-
-    def _remove_hyphenation(self, text: str) -> str:
-        """Remove hifenização de fim de linha."""
-        return re.sub(r"(\w+)-\n(\w+)", r"\1\2", text)
-
-    def _clean_paragraph(self, text: str) -> str:
-        """Limpa e normaliza o texto do parágrafo."""
-        text = re.sub(r"\n(?![A-Z•\-\d])", " ", text)
-        text = re.sub(r"\s+", " ", text)
+    @staticmethod
+    def _normalize_ocr_spacing(text: str) -> str:
+        """Corrige espaçamentos típicos de OCR sem quebrar palavras."""
+        text = re.sub(r"(\w):(\w)", r"\1: \2", text)
+        text = re.sub(r"(\w)\.(\s?\w)", r"\1. \2", text)
+        text = re.sub(r"([a-záéíóúâêôãõüç])([A-ZÁÉÍÓÚÂÊÔÃÕÜÇ])", r"\1 \2", text)
+        text = re.sub(r"\s{2,}", " ", text)
         return text.strip()
 
-    def _is_title_block(self, blocks: list[TextBlock]) -> bool:
-        """Verifica se os blocos representam um título."""
-        if not blocks:
-            return False
+    # ------------------------------------------------------------------
+    # Página nativa (texto) → parágrafos no DOCX
+    # ------------------------------------------------------------------
 
-        avg_size = sum(b.font_size for b in blocks) / len(blocks)
-        has_bold = any(b.is_bold for b in blocks)
-        short_text = len(self._blocks_to_paragraph_text(blocks)) < 100
-
-        return (avg_size > 14 or has_bold) and short_text
-
-    def _apply_title_style(self, para, first_block: TextBlock) -> None:
-        """Aplica estilo de título ao parágrafo."""
-        if first_block.font_size >= 18:
-            para.style = "Heading 1"
-        elif first_block.font_size >= 14:
-            para.style = "Heading 2"
-        else:
-            para.style = "Heading 3"
-
-    def _apply_paragraph_style(self, para, blocks: list[TextBlock]) -> None:
-        """Aplica estilo ao parágrafo baseado na análise."""
-        if blocks:
-            first_block = blocks[0]
-
-            if first_block.x0 > 100:
-                para.alignment = WD_ALIGN_PARAGRAPH.CENTER
-            else:
-                para.alignment = WD_ALIGN_PARAGRAPH.JUSTIFY
-
-    def _apply_text_formatting(self, run, blocks: list[TextBlock]) -> None:
-        """Aplica formatação de texto (negrito, itálico, fonte)."""
-        if not blocks or not self.options.preserve_formatting:
-            return
-
-        first_block = blocks[0]
-
-        has_bold = any(b.is_bold for b in blocks)
-        has_italic = any(b.is_italic for b in blocks)
-
-        run.bold = has_bold
-        run.italic = has_italic
-
-        if first_block.font_size > 0:
-            run.font.size = Pt(min(first_block.font_size, 24))
-
-    def _extract_and_add_images(
-        self,
-        word_doc: WordDocument,
-        page: fitz.Page,
-        page_analysis: PageAnalysis,
+    def _native_page_to_docx(
+        self, word_doc: WordDocument, page: fitz.Page, page_num: int,
     ) -> None:
-        """Extrai e adiciona imagens da página."""
-        image_list = page.get_images(full=True)
+        blocks = page.get_text("dict", flags=fitz.TEXT_PRESERVE_WHITESPACE)["blocks"]
 
-        for img_info in image_list:
-            try:
-                xref = img_info[0]
-                base_image = page.parent.extract_image(xref)
+        for block in blocks:
+            if block["type"] == 1 and self.options.extract_images:
+                self._add_image_block(word_doc, page, block)
+                continue
 
-                if base_image:
-                    image_bytes = base_image["image"]
-                    image_stream = io.BytesIO(image_bytes)
+            if block["type"] != 0:
+                continue
 
-                    max_width = Inches(self.options.max_image_width / 96)
+            for line in block.get("lines", []):
+                spans = line.get("spans", [])
+                if not spans:
+                    continue
 
-                    word_doc.add_picture(image_stream, width=max_width)
-                    self._result.images_extracted += 1
+                line_text = "".join(s.get("text", "") for s in spans).strip()
+                if not line_text:
+                    continue
 
-            except Exception as e:
-                self._result.warnings.append(f"Erro ao extrair imagem: {e}")
+                para = word_doc.add_paragraph()
 
-    def _add_word_header(self, word_doc: WordDocument, header_text: str) -> None:
-        """Adiciona cabeçalho ao documento Word."""
-        section = word_doc.sections[-1]
-        header = section.header
-        para = header.paragraphs[0] if header.paragraphs else header.add_paragraph()
+                for span in spans:
+                    span_text = span.get("text", "")
+                    if not span_text:
+                        continue
 
-        clean_text = re.sub(r"\{NUM\}", "", header_text).strip()
-        if clean_text:
-            para.text = clean_text
-            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+                    run = para.add_run(span_text)
+                    size = span.get("size", 11)
+                    flags = span.get("flags", 0)
 
-    def _add_word_footer(self, word_doc: WordDocument, footer_text: str) -> None:
-        """Adiciona rodapé ao documento Word."""
-        section = word_doc.sections[-1]
-        footer = section.footer
-        para = footer.paragraphs[0] if footer.paragraphs else footer.add_paragraph()
+                    run.font.size = Pt(min(size, 24))
+                    run.bold = bool(flags & 2**4)
+                    run.italic = bool(flags & 2**1)
 
-        clean_text = re.sub(r"\{NUM\}", "", footer_text).strip()
-        if clean_text:
-            para.text = clean_text
-            para.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    def _add_image_block(
+        self, word_doc: WordDocument, page: fitz.Page, block: dict,
+    ) -> None:
+        try:
+            bbox = block.get("bbox", (0, 0, 0, 0))
+            img_width_pt = bbox[2] - bbox[0]
 
-        self._add_page_number_field(para)
+            xref = block.get("image", None)
+            if xref is None:
+                img_list = page.get_images(full=True)
+                if not img_list:
+                    return
+                xref = img_list[0][0]
 
-    def _add_page_number_field(self, para) -> None:
-        """Adiciona campo de número de página."""
-        run = para.add_run()
-        fld_char_begin = OxmlElement("w:fldChar")
-        fld_char_begin.set(qn("w:fldCharType"), "begin")
+            base_image = page.parent.extract_image(xref)
+            if not base_image:
+                return
 
-        instr_text = OxmlElement("w:instrText")
-        instr_text.text = "PAGE"
+            image_stream = io.BytesIO(base_image["image"])
+            max_w = min(Inches(self.options.max_image_width / 96), Pt(img_width_pt))
+            word_doc.add_picture(image_stream, width=max_w)
+            self._result.images_extracted += 1
+        except Exception as e:
+            self._result.warnings.append(f"Erro ao extrair imagem: {e}")
 
-        fld_char_end = OxmlElement("w:fldChar")
-        fld_char_end.set(qn("w:fldCharType"), "end")
+    # ------------------------------------------------------------------
+    # Configuração de seção / layout
+    # ------------------------------------------------------------------
 
-        run._r.append(fld_char_begin)
-        run._r.append(instr_text)
-        run._r.append(fld_char_end)
+    def _setup_section_from_page(
+        self, word_doc: WordDocument, page: fitz.Page, is_first: bool,
+    ) -> None:
+        w, h = page.rect.width, page.rect.height
+
+        if is_first:
+            section = word_doc.sections[0]
+        else:
+            section = word_doc.add_section()
+
+        if w > h:
+            section.orientation = WD_ORIENT.LANDSCAPE
+            section.page_width = Pt(h)
+            section.page_height = Pt(w)
+        else:
+            section.orientation = WD_ORIENT.PORTRAIT
+            section.page_width = Pt(w)
+            section.page_height = Pt(h)
+
+        section.left_margin = Cm(1.5)
+        section.right_margin = Cm(1.5)
+        section.top_margin = Cm(1.5)
+        section.bottom_margin = Cm(1.5)
+
+    # ------------------------------------------------------------------
+    # Utilitários
+    # ------------------------------------------------------------------
 
     def _resolve_page_range(self) -> tuple[Optional[int], Optional[int]]:
-        """Garante que o range de páginas seja coerente (1-based)."""
         start = self.options.start_page
         end = self.options.end_page
 
@@ -367,3 +400,31 @@ class DocxConverter(BaseConverter):
             raise ValueError("end_page não pode ser menor que start_page")
 
         return start, end
+
+    def _get_page_range(
+        self, doc: fitz.Document,
+        start: Optional[int], end: Optional[int],
+    ) -> list[int]:
+        first = (start - 1) if start else 0
+        last = end if end else len(doc)
+        return list(range(first, min(last, len(doc))))
+
+    def _build_page_list(
+        self, pdf_path: str,
+        start: Optional[int], end: Optional[int],
+    ) -> list[int] | None:
+        if start is None and end is None:
+            return None
+        doc = fitz.open(pdf_path)
+        try:
+            return self._get_page_range(doc, start, end)
+        finally:
+            doc.close()
+
+    @staticmethod
+    def _count_pages(pdf_path: str) -> int:
+        doc = fitz.open(pdf_path)
+        try:
+            return len(doc)
+        finally:
+            doc.close()

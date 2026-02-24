@@ -4,6 +4,13 @@ python-docx>=1.1.0
 html2text>=2024.2.26
 pytest>=8.0.0
 
+# OCR dependencies (for scanned PDFs)
+rapidocr-onnxruntime>=1.4.0
+pytesseract>=0.3.10
+
 # GUI dependencies
 customtkinter>=5.2.0
 pillow>=10.0.0
+
+# Build .exe (opcional)
+pyinstaller>=6.0.0
