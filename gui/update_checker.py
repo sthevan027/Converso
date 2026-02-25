@@ -20,7 +20,7 @@ def _parse_version(s: str) -> tuple[int, ...]:
     """Converte string de versão (ex: '1.0.2') em tupla (1, 0, 2) para comparação."""
     s = s.strip()
     parts = re.sub(r"[^0-9.]", "", s).split(".") or ["0"]
-    return tuple(int(p) for p in parts if p.isdigit() or (p := "0"))
+    return tuple(int(p) if p.isdigit() else 0 for p in parts)
 
 
 def check_update(current_version: str, url: Optional[str] = None) -> dict:

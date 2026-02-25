@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 from dataclasses import dataclass, field
-from typing import Optional
 
 import fitz  # PyMuPDF
 from PIL import Image
