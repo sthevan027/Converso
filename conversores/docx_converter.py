@@ -11,18 +11,11 @@ from docx import Document as create_document
 from docx.document import Document as WordDocument
 from docx.enum.section import WD_ORIENT
 from docx.enum.text import WD_ALIGN_PARAGRAPH
-from docx.oxml import OxmlElement
-from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, Cm
 
 from utils.ocr_engine import is_scanned_page, ocr_page, OCRLine
 
-from .base import (
-    BaseConverter,
-    ConversionOptions,
-    ConversionResult,
-    HeaderFooterMode,
-)
+from .base import BaseConverter, ConversionOptions, ConversionResult
 
 
 def _detect_document_type(pdf_path: str) -> str:
