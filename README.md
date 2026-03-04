@@ -1,255 +1,114 @@
 # Converso – Conversor de Documentos
 
-Conversor avançado em Python para transformar documentos entre diferentes formatos com alta fidelidade.
+[![Python](https://img.shields.io/badge/Python-3.10+-3776AB?style=flat&logo=python&logoColor=fff)](https://www.python.org/)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-## Conversões Suportadas
+> Conversor em Python para transformar documentos entre PDF, DOCX, TXT e Markdown com alta fidelidade.
+
+---
+
+## 📋 Conversões suportadas
 
 | Entrada | Saída | Descrição |
-| ------- | ----- | --------- |
-| **PDF** | DOCX | Conversão completa com detecção de estrutura |
+|---------|-------|-----------|
+| **PDF** | DOCX | Conversão com detecção de estrutura |
 | **DOCX** | PDF | Preserva formatação e estilos |
-| **TXT** | PDF | Texto simples para PDF formatado |
-| **MD** | PDF | Markdown para PDF com títulos |
+| **TXT** | PDF | Texto para PDF formatado |
+| **MD** | PDF | Markdown para PDF |
 
----
+## 🚀 Como rodar
 
-## Funcionalidades
+### Pré-requisitos
 
-### PDF → DOCX
-
-- **Detecção automática de cabeçalhos e rodapés** - Identifica e converte para cabeçalho/rodapé nativo do Word
-- **Preservação de formatação** - Mantém negrito, itálico e estilos de fonte
-- **Mesclagem inteligente de parágrafos** - Une parágrafos fragmentados automaticamente
-- **Remoção de hifenização** - Remove hífens de quebra de linha
-- **Extração de imagens** - Extrai e incorpora imagens do PDF
-- **Detecção de títulos** - Identifica e aplica estilos de Heading automaticamente
-
-### DOCX/TXT/MD → PDF
-
-- **Preservação de estilos** - Headings, negrito, itálico
-- **Quebra de texto automática** - Ajusta ao tamanho A4
-- **Suporte a Markdown** - Converte `#`, `##`, `###` para títulos
-- **Paginação automática** - Cria novas páginas conforme necessário
-
----
-
-## Pré‑requisitos
-
-- Python 3.10 ou superior instalado
+- Python 3.10+
 - Windows (testado no PowerShell)
 
----
+### Instalação rápida
 
-## 1. Abrir o projeto
+```bash
+# Clone o repositório
+git clone https://github.com/sthevan027/Converso.git
+cd Converso
 
-No PowerShell:
-
-```powershell
-cd "C:\Users\sthevan\OneDrive\Documentos\projeto\Converso"
-```
-
----
-
-## 2. Criar e ativar o ambiente virtual
-
-Se ainda não existir o ambiente:
-
-```powershell
+# Crie e ative o ambiente virtual
 python -m venv .venv
-```
+.\.venv\Scripts\Activate.ps1   # PowerShell
+# ou
+.\.venv\Scripts\activate.bat   # CMD
 
-### Ativar no PowerShell
-
-```powershell
-.\.venv\Scripts\Activate.ps1
-```
-
-Se estiver usando **CMD**:
-
-```cmd
-.\.venv\Scripts\activate.bat
-```
-
-Se deu certo, o prompt deve ficar parecido com:
-
-```text
-(.venv) PS C:\Users\sthevan\OneDrive\Documentos\projeto\Converso>
-```
-
----
-
-## 3. Instalar as dependências
-
-Com o ambiente **ativado**:
-
-```powershell
+# Instale as dependências
 pip install -r requirements.txt
 ```
 
-As principais bibliotecas usadas:
+### Uso via linha de comando
 
-- `pymupdf` – análise e extração avançada de PDF
-- `python-docx` – criação de documentos Word
-- `pdf2docx` – conversão complementar de PDF para DOCX
-- `html2text` – suporte a outros formatos
-
----
-
-## 4. Usar o conversor
-
-Com o venv ativo e dependências instaladas, rode:
-
-```powershell
-# PDF para DOCX (detecta automaticamente)
+```bash
+# PDF para DOCX
 python conversor.py documento.pdf -v
 
-# DOCX para PDF (detecta automaticamente)
+# DOCX para PDF
 python conversor.py documento.docx -v
 
-# TXT para PDF
-python conversor.py texto.txt -v
-
-# Markdown para PDF
-python conversor.py arquivo.md -v
+# TXT ou Markdown para PDF
+python conversor.py arquivo.txt -v
+python conversor.py README.md -v
 ```
 
-### Opções principais
+### Interface gráfica (GUI)
 
-| Opção | Descrição |
-| ----- | --------- |
-| `--to` / `-t` | Formato de saída (`docx`, `pdf`). Detecta automaticamente se omitido |
-| `--output` / `-o` | Caminho do arquivo ou pasta de saída |
-| `--start-page` | Página inicial (1-based) |
-| `--end-page` | Página final (1-based, inclusiva) |
-| `--verbose` / `-v` | Mostra informações detalhadas |
-
-### Opções de cabeçalho e rodapé
-
-| Opção | Descrição |
-| ----- | --------- |
-| `--header-mode` | `keep`, `remove` ou `convert` (padrão: convert) |
-| `--footer-mode` | `keep`, `remove` ou `convert` (padrão: convert) |
-| `--header-margin` | Proporção da página para cabeçalho (padrão: 0.10) |
-| `--footer-margin` | Proporção da página para rodapé (padrão: 0.10) |
-
-### Opções de qualidade e formatação
-
-| Opção | Descrição |
-| ----- | --------- |
-| `--quality` / `-q` | `fast`, `balanced` ou `high` (padrão: balanced) |
-| `--no-formatting` | Desativa preservação de formatação |
-| `--no-layout` | Desativa preservação de layout |
-| `--no-merge-paragraphs` | Desativa mesclagem de parágrafos |
-| `--keep-hyphenation` | Mantém hifenização de fim de linha |
-
-### Opções de imagem
-
-| Opção | Descrição |
-| ----- | --------- |
-| `--no-images` | Não extrai imagens do PDF |
-| `--image-quality` | Qualidade JPEG, 1-100 (padrão: 95) |
-| `--max-image-width` | Largura máxima em pixels (padrão: 800) |
-
-### Exemplos
-
-```powershell
-# === PDF para DOCX ===
-
-# Conversão básica (detecta formato automaticamente)
-python conversor.py docs\relatorio.pdf -v
-
-# Alta qualidade com todas as otimizações
-python conversor.py docs\relatorio.pdf --to docx --quality high -v
-
-# Converter apenas da página 2 até a 5
-python conversor.py docs\relatorio.pdf --start-page 2 --end-page 5 -v
-
-# Remover cabeçalhos e rodapés
-python conversor.py docs\relatorio.pdf --header-mode remove --footer-mode remove -v
-
-# Conversão rápida sem imagens
-python conversor.py docs\relatorio.pdf --quality fast --no-images -v
-
-# === DOCX para PDF ===
-
-# Conversão básica (detecta formato automaticamente)
-python conversor.py docs\documento.docx -v
-
-# Especificar arquivo de saída
-python conversor.py docs\documento.docx -o "C:\saida\documento_final.pdf" -v
-
-# === TXT para PDF ===
-
-python conversor.py notas.txt -v
-
-# === Markdown para PDF ===
-
-python conversor.py README.md -o documentacao.pdf -v
-```
-
----
-
-## 5. Interface gráfica (GUI) e executável .exe
-
-### Iniciar a GUI (com criação/verificação do ambiente virtual)
-
-Use o **launcher** (CMD ou PowerShell) para criar/verificar o ambiente virtual e iniciar o app:
-
-```powershell
+```bash
+# Usando o launcher (recomendado)
 .\run_converso.bat
-```
 
-O launcher:
-- Cria a pasta `.venv` se não existir
-- Roda `pip install -r requirements.txt` para garantir dependências
-- Inicia a aplicação (`python run_gui.py`)
-
-Se preferir fazer tudo manualmente (com o venv já ativado):
-
-```powershell
+# Ou manualmente
 python run_gui.py
 ```
 
-### Verificação de atualização
+### Gerar executável .exe
 
-Dentro do app, em **Configurações → Sobre**, você pode:
+```bash
+.\build_exe.bat
+# O .exe será criado em dist/Converso.exe
+```
 
-1. **URL de atualização (opcional):** informe uma URL que retorne a versão mais recente, por exemplo:
-   - Um arquivo JSON: `{"version": "1.0.1", "url": "https://github.com/.../releases"}`
-   - Ou um arquivo de texto com uma linha: `1.0.1`
-2. Clicar em **Verificar atualizações** para checar se há nova versão. Se houver e você tiver informado `url` no JSON, o app pode abrir o link de download.
+## 🛠️ Tecnologias
 
-O executável (.exe) também inclui essa função: ao rodar o Converso.exe, use Configurações → Verificar atualizações (desde que a URL esteja configurada).
+| Biblioteca | Uso |
+|------------|-----|
+| pymupdf | Análise e extração de PDF |
+| python-docx | Documentos Word |
+| pdf2docx | Conversão PDF→DOCX |
+| customtkinter | Interface gráfica |
+| PyInstaller | Gerar .exe |
 
-### Gerar um executável .exe (opcional)
+## 📦 Opções principais
 
-Assim você não precisa rodar `python run_gui.py` — basta dar duplo clique no `.exe`.
+| Opção | Descrição |
+|-------|-----------|
+| `--to` / `-t` | Formato de saída (docx, pdf) |
+| `--output` / `-o` | Arquivo ou pasta de saída |
+| `--start-page` | Página inicial |
+| `--end-page` | Página final |
+| `--verbose` / `-v` | Saída detalhada |
+| `--quality` | fast, balanced, high |
+| `--no-images` | Não extrair imagens |
 
-1. Com o ambiente ativado e dependências instaladas (`pip install -r requirements.txt`).
-2. Execute o script de build:
+## 📁 Estrutura
 
-   **No CMD ou PowerShell:**
-   ```powershell
-   .\build_exe.bat
-   ```
-
-   **Ou manualmente:**
-   ```powershell
-   pip install pyinstaller
-   pyinstaller converso.spec
-   ```
-
-3. O executável será criado em **`dist\Converso.exe`**. Copie esse arquivo para onde quiser e execute com duplo clique.
-
-**Observação:** O primeiro build pode demorar alguns minutos. Se você tiver um ícone para o app, coloque em `gui/assets/icon.ico` e edite `converso.spec` para incluir a pasta `gui/assets` em `datas` (instruções no próprio arquivo).
+```
+Converso/
+├── conversor.py          # Script principal
+├── run_gui.py            # Launcher da GUI
+├── run_converso.bat      # Script de execução
+├── build_exe.bat         # Build do executável
+├── converso.spec         # Config PyInstaller
+├── requirements.txt
+├── conversores/          # Módulos de conversão
+├── gui/                  # Interface gráfica
+├── utils/
+└── tests/
+```
 
 ---
 
-## 6. Próximos passos (roadmap rápido)
-
-- Implementar conversão **PDF → HTML** usando `PyMuPDF`
-- Gerar **Markdown** reaproveitando o HTML
-- Adicionar testes automatizados com `pytest`
-- Melhorar detecção de tabelas
-- OCR para PDFs escaneados
-- Melhorar conversão DOCX → PDF com suporte a imagens
+**Desenvolvido por [Sthevan Santos](https://github.com/sthevan027)**
