@@ -854,6 +854,7 @@ class MainCard(ctk.CTkFrame):
         )
         self._on_converted = on_converted
         self.selected_file: Optional[Path] = None
+        self.selected_files: list[Path] = []  # Lote: múltiplos arquivos
         self.is_converting = False
         self._format_buttons: list[FormatButton] = []
         self._available_formats: list[str] = []
@@ -884,8 +885,16 @@ class MainCard(ctk.CTkFrame):
 
         self._file_info = FileInfoBar(content, on_clear=self._clear_selection)
 
-        self._drop_zone = DropZone(content, command=self._open_file_dialog, height=180)
-        self._drop_zone.pack(fill="x", pady=(0, 14))
+        drop_row = ctk.CTkFrame(content, fg_color="transparent")
+        drop_row.pack(fill="x", pady=(0, 14))
+        self._drop_zone = DropZone(drop_row, command=lambda: self._open_file_dialog(False), height=180)
+        self._drop_zone.pack(side="left", fill="x", expand=True, padx=(0, 8))
+        ctk.CTkButton(
+            drop_row, text="+ Vários", width=80, height=36, font=Theme.FONT_SMALL,
+            corner_radius=Theme.RADIUS_SM, fg_color="transparent", border_width=1,
+            border_color=Theme.BORDER_LIGHT, hover_color=Theme.BG_HOVER,
+            text_color=Theme.TEXT_SECONDARY, command=lambda: self._open_file_dialog(True),
+        ).pack(side="right")
 
         self._opts_panel = OptionsPanel(content)
         self._opts_panel.pack(fill="x", pady=(0, 14))
@@ -962,17 +971,55 @@ class MainCard(ctk.CTkFrame):
                 self._status_dot.configure(fg_color=Theme.TEXT_MUTED)
                 self._status_text.configure(text="Selecione um arquivo", text_color=Theme.TEXT_MUTED)
 
-    def _open_file_dialog(self) -> None:
-        fp = filedialog.askopenfilename(
-            title="Selecionar arquivo para conversão",
-            filetypes=[
-                ("Todos suportados", "*.pdf *.docx *.txt *.md"),
-                ("PDF", "*.pdf"), ("DOCX", "*.docx"),
-                ("Texto", "*.txt"), ("Markdown", "*.md"),
-            ],
-        )
-        if fp:
-            self._on_file_selected(Path(fp))
+    def _open_file_dialog(self, multiple: bool = False) -> None:
+        if multiple:
+            fps = filedialog.askopenfilenames(
+                title="Selecionar arquivos para conversão em lote",
+                filetypes=[
+                    ("Todos suportados", "*.pdf *.docx *.txt *.md"),
+                    ("PDF", "*.pdf"), ("DOCX", "*.docx"),
+                    ("Texto", "*.txt"), ("Markdown", "*.md"),
+                ],
+            )
+            if fps:
+                paths = [Path(p) for p in fps if Path(p).exists()]
+                valid = [p for p in paths if p.suffix.lower() in OUTPUT_FORMATS]
+                if valid:
+                    self._on_files_selected(valid)
+        else:
+            fp = filedialog.askopenfilename(
+                title="Selecionar arquivo para conversão",
+                filetypes=[
+                    ("Todos suportados", "*.pdf *.docx *.txt *.md"),
+                    ("PDF", "*.pdf"), ("DOCX", "*.docx"),
+                    ("Texto", "*.txt"), ("Markdown", "*.md"),
+                ],
+            )
+            if fp:
+                self._on_file_selected(Path(fp))
+
+    def _on_files_selected(self, paths: list[Path]) -> None:
+        """Seleção em lote: múltiplos arquivos."""
+        if len(paths) == 1:
+            self._on_file_selected(paths[0])
+            return
+        self.selected_files = paths
+        self.selected_file = paths[0]
+        file_type = FILE_TYPE_NAMES.get(paths[0].suffix.lower(), "Arquivo")
+        self._file_info.set_file(paths[0], f"{file_type} (+{len(paths) - 1} mais)")
+        self._drop_zone.set_file_selected(True, f"{len(paths)} arquivo(s)")
+        self._opts_panel.set_input_file(paths[0].name)
+        available = OUTPUT_FORMATS.get(paths[0].suffix.lower(), [])
+        self._available_formats = available
+        all_fmts = ["PDF", "DOCX", "HTML", "MD"]
+        for i, fmt in enumerate(all_fmts):
+            enabled = fmt in available
+            self._format_buttons[i].set_enabled(enabled)
+            self._format_buttons[i].set_active(False)
+        if available:
+            first_idx = all_fmts.index(available[0])
+            self._select_format(first_idx)
+        self._set_convert_enabled(True)
 
     def _on_file_selected(self, path: Path) -> None:
         if not path.exists():
@@ -983,6 +1030,7 @@ class MainCard(ctk.CTkFrame):
             self._status_dot.configure(fg_color=Theme.ERROR)
             return
 
+        self.selected_files = [path]
         self.selected_file = path
         file_type = FILE_TYPE_NAMES.get(ext, "Arquivo")
         self._file_info.set_file(path, file_type)
@@ -1015,6 +1063,7 @@ class MainCard(ctk.CTkFrame):
 
     def _clear_selection(self) -> None:
         self.selected_file = None
+        self.selected_files = []
         self._file_info.clear()
         self._drop_zone.reset()
         for btn in self._format_buttons:
@@ -1027,7 +1076,8 @@ class MainCard(ctk.CTkFrame):
         self._progress.set_visible(False)
 
     def _start_conversion(self) -> None:
-        if not self.selected_file or self.is_converting:
+        files_to_convert = self.selected_files if self.selected_files else ([self.selected_file] if self.selected_file else [])
+        if not files_to_convert or self.is_converting:
             return
         self.is_converting = True
         self._update_ui_converting(True)
@@ -1040,13 +1090,31 @@ class MainCard(ctk.CTkFrame):
                 break
 
         thread = threading.Thread(
-            target=self._run_conversion,
-            args=(self.selected_file, active_fmt, options),
+            target=self._run_batch_conversion,
+            args=(files_to_convert, active_fmt, options),
             daemon=True,
         )
         thread.start()
 
-    def _run_conversion(self, input_file: Path, target_format: str, options: dict) -> None:
+    def _run_batch_conversion(self, files: list[Path], target_format: str, options: dict) -> None:
+        """Conversão em lote: processa cada arquivo em sequência."""
+        total = len(files)
+        for i, input_file in enumerate(files):
+            idx, t = i + 1, total
+            self.after(0, lambda f=input_file, n=idx, tot=t: self._progress.add_log(f"📄 [{n}/{tot}] {f.name}"))
+            self._run_conversion(
+                input_file, target_format, options,
+                is_batch=(total > 1),
+            )
+        self.after(0, lambda: self._conversion_finished(True))
+
+    def _run_conversion(
+        self,
+        input_file: Path,
+        target_format: str,
+        options: dict,
+        is_batch: bool = False,
+    ) -> None:
         try:
             from conversores.base import ConversionOptions, HeaderFooterMode, TranscriptionQuality
             from conversores.docx_converter import DocxConverter
@@ -1097,7 +1165,10 @@ class MainCard(ctk.CTkFrame):
             self.after(0, lambda: self._progress.set_progress(20))
             self.after(0, lambda: self._progress.add_log("📖 Lendo documento de entrada..."))
 
-            output_dir = options.get("output_dir")
+            opts = dict(options)
+            if is_batch:
+                opts["output_filename"] = None  # Cada arquivo usa seu próprio nome
+            output_dir = opts.get("output_dir")
             if not output_dir:
                 try:
                     from gui.settings_store import load_settings
@@ -1107,12 +1178,12 @@ class MainCard(ctk.CTkFrame):
                         output_dir = default_dir
                 except Exception:
                     pass
-            output_filename = options.get("output_filename")
+            output_filename = opts.get("output_filename")
             if output_filename:
                 base_dir = Path(output_dir) if output_dir else input_file.parent
                 output_path = base_dir / f"{output_filename}.{target_format}"
             else:
-                output_path = build_output_path(str(input_file), output_dir, target_format)
+                output_path = build_output_path(str(input_file), output_dir or None, target_format)
 
             self.after(0, lambda: self._progress.set_status("Convertendo..."))
             self.after(0, lambda: self._progress.set_progress(40))
@@ -1133,7 +1204,8 @@ class MainCard(ctk.CTkFrame):
             self.after(0, lambda: self._progress.add_log(f"✅ Concluído: {Path(output_path).name}"))
             self.after(0, lambda: self._progress.show_success(
                 message="Conversão concluída!", details=details, output_path=Path(output_path)))
-            self.after(0, lambda: self._conversion_finished(True))
+            if not is_batch:
+                self.after(0, lambda: self._conversion_finished(True))
 
             try:
                 from gui.history_store import add_entry
@@ -1155,7 +1227,8 @@ class MainCard(ctk.CTkFrame):
                 message="Erro na conversão",
                 details=err[:120] + "..." if len(err) > 120 else err,
             ))
-            self.after(0, lambda: self._conversion_finished(False))
+            if not is_batch:
+                self.after(0, lambda: self._conversion_finished(False))
 
             try:
                 from gui.history_store import add_entry
@@ -1691,6 +1764,7 @@ class VirexApp(ctk.CTk):
             ctk.set_appearance_mode("dark")
         self._setup_window()
         self._create_layout()
+        self._bind_shortcuts()
         # Verificação de atualização ao abrir o aplicativo (em background, após a janela estar visível)
         self.after(800, self._startup_update_check)
 
@@ -1746,6 +1820,35 @@ class VirexApp(ctk.CTk):
 
     def _on_menu(self, index: int) -> None:
         self.main_content.show_page(index)
+
+    def _bind_shortcuts(self) -> None:
+        """Atalhos de teclado: Ctrl+O abrir, Ctrl+Shift+O lote, Ctrl+Return converter, Escape limpar."""
+        self.bind("<Control-o>", self._shortcut_open_file)
+        self.bind("<Control-O>", self._shortcut_open_file)
+        self.bind("<Control-Shift-O>", self._shortcut_open_batch)
+        self.bind("<Control-Shift-o>", self._shortcut_open_batch)
+        self.bind("<Control-Return>", self._shortcut_convert)
+        self.bind("<Escape>", self._shortcut_clear)
+
+    def _shortcut_open_file(self, event=None) -> None:
+        card = self.main_content._conversion_page.main_card
+        if card and not card.is_converting:
+            card._open_file_dialog(False)
+
+    def _shortcut_open_batch(self, event=None) -> None:
+        card = self.main_content._conversion_page.main_card
+        if card and not card.is_converting:
+            card._open_file_dialog(True)
+
+    def _shortcut_convert(self, event=None) -> None:
+        card = self.main_content._conversion_page.main_card
+        if card and card.selected_file and not card.is_converting and card._convert_btn.cget("state") == "normal":
+            card._start_conversion()
+
+    def _shortcut_clear(self, event=None) -> None:
+        card = self.main_content._conversion_page.main_card
+        if card and not card.is_converting:
+            card._clear_selection()
 
 
 ConversoApp = VirexApp
