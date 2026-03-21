@@ -5,7 +5,8 @@ html2text>=2024.2.26
 pytest>=8.0.0
 
 # OCR dependencies (for scanned PDFs)
-rapidocr-onnxruntime>=1.4.0
+# RapidOCR preferido; pytesseract como fallback (requer Tesseract no sistema)
+rapidocr-onnxruntime>=1.1.0
 pytesseract>=0.3.10
 
 # GUI dependencies
